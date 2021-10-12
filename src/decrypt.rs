@@ -20,7 +20,7 @@ pub fn dec_xor_cbc_from_file(file_path: &PathBuf, key: &str, iv: &str) -> String
     // TODO 
     let file_contents = File::open(&file_path).expect("Failed to find file");
     // Convert file to bytes
-    let ciphertext = base64_to_hex(b64_str)
+    let ciphertext = base64_to_hex();
     // Convert key to bytes
     // Convert IV to bytes
     // C
