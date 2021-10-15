@@ -148,14 +148,14 @@ mod tests {
                 Err(_) => {},
             }
         });
-        // let key = b"YELLOW SUBMARINE";
-        // let mut result = String::from("");
-        // unsafe {
-        //     result = dec_xor_cbc(&mut ciphertext.as_bytes_mut(), key);
-        // }
+        let key = b"YELLOW SUBMARINE";
+        let mut result = String::from("");
+        unsafe {
+            result = dec_xor_cbc(&mut ciphertext.as_bytes_mut(), key);
+        }
         
         // CURRENTLY this seems to just be printing the numerical code for each byte
-        // println!("{}", result);
+        println!("{}", result);
     }
 
     #[test] // Cryptopals 1:7

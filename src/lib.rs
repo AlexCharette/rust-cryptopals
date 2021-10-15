@@ -1,3 +1,4 @@
+#![allow(warnings, unused_imports)]
 
 extern crate base64;
 
