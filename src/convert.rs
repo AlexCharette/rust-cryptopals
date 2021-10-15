@@ -1,6 +1,6 @@
 
-pub fn hexstr_to_base64(hex_str: &str) -> String {
-    base64::encode(&hexstr_to_bytes(hex_str))
+pub fn hexstr_to_base64(hexstr: &str) -> String {
+    base64::encode(&hexstr_to_bytes(hexstr))
 }
 
 pub fn base64_to_hex(b64_str: &str) -> String { 
@@ -8,8 +8,8 @@ pub fn base64_to_hex(b64_str: &str) -> String {
     hex::encode(&b64_bytes)
 }
 
-pub fn hexstr_to_bytes(hex_str: &str) -> Vec<u8> {
-    let mut hex_bytes = hex_str.as_bytes().iter().filter_map(|b| {
+pub fn hexstr_to_bytes(hexstr: &str) -> Vec<u8> {
+    let mut hex_bytes = hexstr.as_bytes().iter().filter_map(|b| {
         match b {
             b'0'..=b'9' => Some(b - b'0'),
             b'a'..=b'f' => Some(b - b'a' + 10),
@@ -46,9 +46,9 @@ mod tests {
 
     #[test] // Cryptopals 1:1
     fn converts_hex_to_b64() {
-        let hex_str = "49276d206b696c6c696e6720796f757220627261696e206c696b65206120706f69736f6e6f7573206d757368726f6f6d";
+        let hexstr = "49276d206b696c6c696e6720796f757220627261696e206c696b65206120706f69736f6e6f7573206d757368726f6f6d";
         let expected = "SSdtIGtpbGxpbmcgeW91ciBicmFpbiBsaWtlIGEgcG9pc29ub3VzIG11c2hyb29t";
-        let bytes = hexstr_to_bytes(hex_str);
+        let bytes = hexstr_to_bytes(hexstr);
         assert_eq!(&base64::encode(&bytes), expected);
     } 
 }

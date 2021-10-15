@@ -2,7 +2,7 @@ use std::error::Error;
 use std::str::from_utf8;
 use base64::DecodeError;
 use hex::ToHex;
-use openssl::symm::{Cipher, encrypt};
+use openssl::{error::ErrorStack, symm::{Cipher, encrypt}};
 use super::pad_pkcs7;
 
 pub fn enc_xor_cbc(bytes: &mut [u8], key: &[u8]) -> Result<String, Box<dyn std::error::Error>> {
@@ -21,12 +21,11 @@ pub fn enc_xor_cbc(bytes: &mut [u8], key: &[u8]) -> Result<String, Box<dyn std::
         }
         let fake_iv: Vec<u8> = vec![];
         let ciphertext = fixed_xor(block, &prev_ciphertext);
-        let ciphertext = enc_aes128_ecb(&ciphertext, &key, &fake_iv);
-        match ciphertext {
-            Ok(text) => {
-                let text_bytes = text.as_bytes().to_vec(); 
-                prev_ciphertext = text_bytes.clone();
-                cipher_blocks.push(text_bytes);
+        let encrypted_bytes = enc_aes128_ecb(&ciphertext, &key, &fake_iv);
+        match encrypted_bytes {
+            Ok(bytes) => {
+                prev_ciphertext = bytes.clone();
+                cipher_blocks.push(bytes);
             },
             Err(err) => {},
         }
@@ -36,17 +35,14 @@ pub fn enc_xor_cbc(bytes: &mut [u8], key: &[u8]) -> Result<String, Box<dyn std::
     Ok(encrypted_bytes.encode_hex::<String>())
 }
 
-pub fn enc_aes128_ecb(bytes: &[u8], key: &[u8], iv: &[u8]) -> Result<String, DecodeError> {
+pub fn enc_aes128_ecb(bytes: &[u8], key: &[u8], iv: &[u8]) -> Result<Vec<u8>, ErrorStack> {
     let cipher = Cipher::aes_128_ecb();
-    let ciphertext = encrypt(
+    encrypt(
         cipher, 
         &key,
         Some(iv),
         bytes,
-    ).unwrap();
-    let ciphertext = from_utf8(&ciphertext).expect("Failed to convert bytes to valid utf-8");
-
-    Ok(String::from(ciphertext))
+    )
 }
 
 pub fn enc_aes128_ecb_b64(b64_str: &str, key: &str, iv: &[u8]) -> Result<String, DecodeError> {

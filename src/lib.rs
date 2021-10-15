@@ -6,6 +6,14 @@ pub mod convert;
 pub mod decrypt;
 pub mod encrypt;
 
+// pub fn bytes_to_valid_utf8(bytes: &mut Vec<u8>) -> Vec<u8> {
+//     bytes.iter_mut().for_each(|byte| {
+//         if byte > 255 {
+
+//         }
+//     })
+// }
+
 pub fn pad_pkcs7(bytes: &mut Vec<u8>, size: usize) {
     assert!(bytes.len() < size);
     bytes.resize(size, 4u8);
@@ -49,13 +57,15 @@ mod integration_tests {
 
     #[test]
     fn encrypts_and_decrypts_aes128_ecb() {
-        let mut plaintext = b"Mellow bubmarone".to_owned();
-        let key = b"YELLOW SUBMARINE";
+        let key = "YELLOW SUBMARINE";
         let expected = "Mellow bubmarone";
-        let iv: Vec<u8> = vec![];
-        let ciphertext = encrypt::enc_aes128_ecb(&mut plaintext[..], key, &iv).ok().unwrap();
+        let mut b64_str = base64::encode(expected);
+        let iv = *b"\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0A\x0B\x0C\x0D\x0E\x0F\
+            \x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1A\x1B\x1C\x1D\x1E\x1F";
+        let ciphertext = encrypt::enc_aes128_ecb_b64(&b64_str, key, &iv).ok().unwrap();
         println!("Encrypted: {}", &ciphertext);
-        let result = decrypt::dec_aes128_ecb(&mut convert::hexstr_to_bytes(&ciphertext), key, &iv)
+        let key_bytes = b"YELLOW SUBMARINE";
+        let result = decrypt::dec_aes128_ecb(&mut convert::hexstr_to_bytes(&ciphertext), key_bytes, &iv)
             .ok()
             .unwrap();
         assert_eq!(&format!("{}", &result.plaintext), &format!("{}", &expected));

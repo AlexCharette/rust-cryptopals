@@ -1,8 +1,4 @@
 use std::convert::TryFrom;
-use std::fs::File;
-use std::io::prelude::*;
-use std::io::BufReader;
-use std::path::PathBuf;
 use std::str::from_utf8;
 use base64::DecodeError;
 use openssl::symm::{Cipher, decrypt};
@@ -14,18 +10,6 @@ use super::encrypt::*;
 pub struct DecryptResult {
     pub plaintext: String,
     pub key: Option<String>,
-}
-
-pub fn dec_xor_cbc_from_file(file_path: &PathBuf, key: &str, iv: &str) -> String {
-    // TODO 
-    let file_contents = File::open(&file_path).expect("Failed to find file");
-    // Convert file to bytes
-    let ciphertext = base64_to_hex();
-    // Convert key to bytes
-    // Convert IV to bytes
-    // C
-
-    return String::from("")
 }
 
 pub fn dec_xor_cbc(bytes: &mut [u8], key: &[u8]) -> String {
@@ -170,6 +154,7 @@ mod tests {
             result = dec_xor_cbc(&mut ciphertext.as_bytes_mut(), key);
         }
         
+        // CURRENTLY this seems to just be printing the numerical code for each byte
         println!("{}", result);
     }
 
