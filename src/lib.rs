@@ -59,7 +59,7 @@ mod integration_tests {
     fn encrypts_and_decrypts_aes128_ecb() {
         let key = "YELLOW SUBMARINE";
         let expected = "Mellow bubmarone";
-        let mut b64_str = base64::encode(expected);
+        let b64_str = base64::encode(expected);
         let iv = *b"\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0A\x0B\x0C\x0D\x0E\x0F\
             \x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1A\x1B\x1C\x1D\x1E\x1F";
         let ciphertext = encrypt::enc_aes128_ecb_b64(&b64_str, key, &iv).ok().unwrap();

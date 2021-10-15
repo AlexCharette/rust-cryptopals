@@ -27,7 +27,8 @@ pub fn enc_xor_cbc(bytes: &mut [u8], key: &[u8]) -> Result<String, Box<dyn std::
                 prev_ciphertext = bytes.clone();
                 cipher_blocks.push(bytes);
             },
-            Err(err) => {},
+            // TODO find a way to use this error
+            Err(_) => {},
         }
     });
     let encrypted_bytes: Vec<u8> = cipher_blocks.into_iter().flatten().collect();
