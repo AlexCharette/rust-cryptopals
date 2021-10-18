@@ -2,38 +2,45 @@ use std::error::Error;
 use std::str::from_utf8;
 use base64::DecodeError;
 use hex::ToHex;
+use log::info;
 use openssl::{error::ErrorStack, symm::{Cipher, encrypt}};
 use super::pad_pkcs7;
 
-pub fn enc_xor_cbc(bytes: &mut [u8], key: &[u8]) -> Result<String, Box<dyn std::error::Error>> {
-    const BLOCK_SIZE: usize = 16;
-    assert_eq!(key.len(), BLOCK_SIZE);
+pub fn enc_xor_cbc(bytes: &mut [u8], key: &[u8], iv: &[u8], block_size: usize) -> Result<Vec<u8>, Box<dyn Error>> {
+    assert_eq!(key.len(), block_size);
 
-    let mut prev_ciphertext = vec![0u8; BLOCK_SIZE];
+    let mut prev_cipher_block = iv.to_vec();
     let mut cipher_blocks = Vec::<Vec<u8>>::new();
+    // Split bytes into a vector of block_size'd chunks
     // TODO Is there some way I can make this a vector of slices and have it be functional?
-    let mut blocks: Vec<Vec<u8>> = bytes.chunks_mut(BLOCK_SIZE).map(|chunk| chunk.to_vec()).collect();
+    let mut blocks: Vec<Vec<u8>> = bytes.chunks_mut(block_size).map(|chunk| chunk.to_vec()).collect();
     blocks.iter_mut().for_each(|block| {
-        println!("prev: {:?}", prev_ciphertext);
-        if block.len() < BLOCK_SIZE {
-            pad_pkcs7(block, BLOCK_SIZE);
-            assert!(block.len() == BLOCK_SIZE);
+        println!("Prev: {:?}", prev_cipher_block);
+        if block.len() < block_size {
+            pad_pkcs7(block, block_size);
+            assert!(block.len() == block_size);
         }
         let fake_iv: Vec<u8> = vec![];
-        let ciphertext = fixed_xor(block, &prev_ciphertext);
-        let encrypted_bytes = enc_aes128_ecb(&ciphertext, &key, &fake_iv);
+        let xored_bytes = fixed_xor(block, &prev_cipher_block);
+        let encrypted_bytes = enc_aes128_ecb(&xored_bytes, &key, &fake_iv);
         match encrypted_bytes {
             Ok(bytes) => {
-                prev_ciphertext = bytes.clone();
-                cipher_blocks.push(bytes);
+                println!("Encrypted length: {}", bytes.len());
+                let unpadded_bytes = &bytes[0..16].to_vec();
+                prev_cipher_block = unpadded_bytes.clone();
+                cipher_blocks.push(unpadded_bytes.to_owned());
             },
             // TODO find a way to use this error
-            Err(_) => {},
+            Err(err) => {
+                err.errors().into_iter().for_each(|error| {
+                    eprintln!("{:?}", error)
+                });
+            },
         }
     });
     let encrypted_bytes: Vec<u8> = cipher_blocks.into_iter().flatten().collect();
-    println!("cipher bytes: {:?}", encrypted_bytes);
-    Ok(encrypted_bytes.encode_hex::<String>())
+    info!("Encrypted bytes: {:?}", encrypted_bytes);
+    Ok(encrypted_bytes)
 }
 
 pub fn enc_aes128_ecb(bytes: &[u8], key: &[u8], iv: &[u8]) -> Result<Vec<u8>, ErrorStack> {
@@ -46,26 +53,31 @@ pub fn enc_aes128_ecb(bytes: &[u8], key: &[u8], iv: &[u8]) -> Result<Vec<u8>, Er
     )
 }
 
-pub fn enc_aes128_ecb_b64(b64_str: &str, key: &str, iv: &[u8]) -> Result<String, DecodeError> {
+pub fn enc_aes128_ecb_b64(b64_str: &str, key: &str, iv: &[u8]) -> Result<Vec<u8>, Box<dyn Error>> {
     let bytes: Vec<u8>;
     match base64::decode(b64_str) {
         Ok(v) => {
             bytes = v;
         },
         Err(err) => {
-            return Err(err);
+            return Err(Box::new(err))
         },
     };
     let cipher = Cipher::aes_128_ecb();
-    let ciphertext = encrypt(
+    match encrypt(
         cipher, 
         &key.as_bytes(),
         Some(iv),
         &bytes,
-    ).unwrap();
-    let ciphertext = from_utf8(&ciphertext).expect("Failed to convert bytes to valid utf-8");
-
-    Ok(String::from(ciphertext))
+    ) {
+        Ok(res) => Ok(res),
+        Err(err) => {
+            err.errors().into_iter().for_each(|error| {
+                eprintln!("{:?}", error)
+            });
+            Err(Box::new(err.errors()[0].to_owned()))
+        }
+    }
 }
 
 pub fn enc_repeat_xor(bytes: &[u8], key: &[u8]) -> Result<String, Box<dyn Error>> {

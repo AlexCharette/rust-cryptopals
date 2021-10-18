@@ -5,6 +5,7 @@ use std::hash::{BuildHasher, Hasher};
 use std::io::prelude::*;
 use std::io::BufReader;
 use std::path::PathBuf;
+use log::info;
 use phf::phf_map;
 use super::encrypt::*;
 
@@ -100,7 +101,7 @@ pub fn most_likely_eng_1cx(bytes: &[u8]) -> AnalysisResult {
         let plaintext = enc_single_char_xor(bytes, i);
         if let Ok(result) = plaintext {
             let score = get_char_freq_eng_score(&result.to_lowercase());
-            // println!("{}", result);
+            info!("Result: {}", result);
             if score < lowest_score {
                 lowest_score = score;
                 current_best = result;
@@ -170,7 +171,7 @@ mod tests {
         let mut file_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         file_path.push("data/1.8.txt");
         let result = detect_aes_ecb_in_file(&file_path, 128);
-        println!("{}", &result);
+        info!("Result: {}", &result);
         // assert_eq!(result.trim().to_lowercase(), "now that the party is jumping");
     }
 
@@ -179,7 +180,7 @@ mod tests {
         let mut file_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         file_path.push("data/1.4.txt");
         let result = find_message_in_file_1cx(&file_path);
-        // println!("{}", &result);
+        info!("Result: {}", &result);
         assert_eq!(result.trim().to_lowercase(), "now that the party is jumping");
     }
 
@@ -187,7 +188,7 @@ mod tests {
     fn returns_most_likely_eng() {
         let input = "1b37373331363f78151b7f2b783431333d78397828372d363c78373e783a393b3736";
         let result = most_likely_eng_1cx_hex(input);
-        // println!("Result score: {}", result.score);
+        info!("Result: {}", result.score);
         assert_eq!(result.plaintext.to_lowercase(), "cooking mc's like a pound of bacon");
     } 
 }

@@ -1,6 +1,7 @@
 use std::convert::TryFrom;
 use std::str::from_utf8;
 use base64::DecodeError;
+use log::info;
 use openssl::symm::{Cipher, decrypt};
 
 use super::analyse::*;
@@ -21,15 +22,16 @@ pub fn dec_xor_cbc(bytes: &mut [u8], key: &[u8]) -> String {
     // TODO Is there some way I can make this a vector of slices and have it be functional?
     let mut blocks: Vec<Vec<u8>> = bytes.chunks_mut(BLOCK_SIZE).map(|chunk| chunk.to_vec()).collect();
     blocks.iter_mut().for_each(|block| {
-        println!("prev: {:?}", prev_ciphertext);
+        info!("Prev: {:?}", prev_ciphertext);
         
         let plaintext = fixed_xor(&fixed_xor(&block, key), &prev_ciphertext);
         prev_ciphertext = plaintext.clone();    
         plain_blocks.push(plaintext);
     });
     let plain_bytes: Vec<u8> = plain_blocks.into_iter().flatten().collect();
-    println!("cipher bytes: {:?}", plain_bytes);
-    String::from("")
+    info!("plain bytes: {:?}", plain_bytes);
+    let plaintext = from_utf8(&plain_bytes).expect("Failed to convert bytes to valid utf8");
+    String::from(plaintext)
 }
 
 pub fn dec_aes128_ecb(bytes: &[u8], key: &[u8], iv: &[u8]) -> Result<DecryptResult, DecodeError> {
@@ -132,6 +134,7 @@ mod tests {
     use std::io::prelude::*;
     use std::io::BufReader;
     use std::path::PathBuf;
+    use simple_logger::SimpleLogger;
     use super::*;
 
     #[test] // Cryptopals 2:2
@@ -155,7 +158,7 @@ mod tests {
         }
         
         // CURRENTLY this seems to just be printing the numerical code for each byte
-        println!("{}", result);
+        info!("{}", result);
     }
 
     #[test] // Cryptopals 1:7
@@ -199,7 +202,7 @@ mod tests {
         let expected = "Terminator X: Bring the noise";
         let result = dec_repeat_xor(&ciphertext).ok().unwrap();
 
-        // println!("{}\n{}", result.plaintext, result.key);
+        // log!("{}\n{}", result.plaintext, result.key);
         assert_eq!(result.key.unwrap(), expected);
     }
 }
