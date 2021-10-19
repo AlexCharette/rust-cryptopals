@@ -1,28 +1,35 @@
 use std::error::Error;
+use std::fmt::Debug;
 use std::str::from_utf8;
 use base64::DecodeError;
+use crypto::{
+    aes::{ecb_encryptor, KeySize}, 
+    blockmodes, 
+    symmetriccipher::SymmetricCipherError, 
+    buffer::{BufferResult, ReadBuffer, RefReadBuffer, RefWriteBuffer, WriteBuffer}
+};
 use hex::ToHex;
 use log::info;
 use openssl::{error::ErrorStack, symm::{Cipher, encrypt}};
 use rand::{Rng, thread_rng};
 use super::{get_rand_bytes_16, pad_pkcs7};
 
-pub fn enc_aes128_rand(bytes: &mut [u8]) -> Result<Vec<u8>, Box<dyn Error>> {
-    // TODO Padd with 5-10 bytes before and after
+// pub fn enc_aes128_rand(bytes: &mut [u8]) -> Result<Vec<u8>, Box<dyn Error>> {
+//     // TODO Padd with 5-10 bytes before and after
 
-    let key = get_rand_bytes_16();
-    let iv = get_rand_bytes_16();
-    let use_ecb = thread_rng().gen_bool(1.0 / 2.0);
-    let encrypted_result: Result<Vec<u8>, Box<dyn Error>>;
-    match use_ecb {
-        true => { // use ecb
-            enc_aes128_ecb(bytes, &key, &iv)
-        },
-        false => { // use cbc
-            enc_aes128_cbc(bytes, &key, &iv, 16)
-        }
-    }
-}
+//     let key = get_rand_bytes_16();
+//     let iv = get_rand_bytes_16();
+//     let use_ecb = thread_rng().gen_bool(1.0 / 2.0);
+//     let encrypted_result: Result<Vec<u8>, Box<dyn Error>>;
+//     match use_ecb {
+//         true => { // use ecb
+//             // enc_aes128_ecb(bytes, &key, &iv)
+//         },
+//         false => { // use cbc
+//             enc_aes128_cbc(bytes, &key, &iv, 16)
+//         }
+//     }
+// }
 
 pub fn enc_aes128_cbc(bytes: &mut [u8], key: &[u8], iv: &[u8], block_size: usize) -> Result<Vec<u8>, Box<dyn Error>> {
     assert_eq!(key.len(), block_size);
@@ -34,6 +41,7 @@ pub fn enc_aes128_cbc(bytes: &mut [u8], key: &[u8], iv: &[u8], block_size: usize
     let mut blocks: Vec<Vec<u8>> = bytes.chunks_mut(block_size).map(|chunk| chunk.to_vec()).collect();
     blocks.iter_mut().for_each(|block| {
         println!("Prev: {:?}", prev_cipher_block);
+        
         if block.len() < block_size {
             pad_pkcs7(block, block_size);
             assert!(block.len() == block_size);
@@ -43,10 +51,8 @@ pub fn enc_aes128_cbc(bytes: &mut [u8], key: &[u8], iv: &[u8], block_size: usize
         let encrypted_bytes = enc_aes128_ecb(&xored_bytes, &key, &fake_iv);
         match encrypted_bytes {
             Ok(bytes) => {
-                println!("Encrypted length: {}", bytes.len());
-                let unpadded_bytes = &bytes[0..16].to_vec();
-                prev_cipher_block = unpadded_bytes.clone();
-                cipher_blocks.push(unpadded_bytes.to_owned());
+                prev_cipher_block = bytes.clone();
+                cipher_blocks.push(bytes.to_owned());
             },
             // TODO find a way to use this error
             Err(err) => {
@@ -59,22 +65,49 @@ pub fn enc_aes128_cbc(bytes: &mut [u8], key: &[u8], iv: &[u8], block_size: usize
     Ok(encrypted_bytes)
 }
 
-pub fn enc_aes128_ecb(bytes: &[u8], key: &[u8], iv: &[u8]) -> Result<Vec<u8>, Box<dyn Error>> {
-    let cipher = Cipher::aes_128_ecb();
-    match encrypt(
-        cipher, 
-        &key,
-        Some(iv),
-        bytes,
-    ) {
-        Ok(res) => Ok(res),
-        Err(err) => {
-            err.errors().into_iter().for_each(|error| {
-                eprintln!("{:?}", error)
-            });
-            Err(Box::new(err.errors()[0].to_owned()))
+pub fn enc_aes128_ecb(bytes: &[u8], key: &[u8], iv: &[u8]) -> Result<Vec<u8>, SymmetricCipherError> {
+    let mut encryptor = ecb_encryptor(
+        KeySize::KeySize128, 
+        key, 
+        blockmodes::NoPadding,
+    );
+    let mut final_result = Vec::<u8>::new();
+    let mut read_buff = RefReadBuffer::new(bytes);
+    let mut out_buff = [0u8; 4096];
+    let mut write_buff = RefWriteBuffer::new(&mut out_buff);
+    loop {
+        let result = encryptor.encrypt(&mut read_buff, &mut write_buff, true)?;
+
+        final_result.extend(write_buff.take_read_buffer().take_remaining().iter().map(|&i| i));
+
+        match result {
+            BufferResult::BufferUnderflow => break,
+            BufferResult::BufferOverflow => {}
         }
     }
+    Ok(final_result)
+    // match encryptor.encrypt(&mut input, &mut output, false) {
+    //     Ok(res) => {
+    //         final_result.extend()
+    //         Ok(output.take_read_buffer().take_remaining().to_vec())
+    //     },
+    //     Err(err) => Err(err)
+    // }
+    // let cipher = Cipher::aes_128_ecb();
+    // match encrypt(
+    //     cipher, 
+    //     &key,
+    //     Some(iv),
+    //     bytes,
+    // ) {
+    //     Ok(res) => Ok(res),
+    //     Err(err) => {
+    //         err.errors().into_iter().for_each(|error| {
+    //             eprintln!("{:?}", error)
+    //         });
+    //         Err(Box::new(err.errors()[0].to_owned()))
+    //     }
+    // }
 }
 
 pub fn enc_aes128_ecb_b64(b64_str: &str, key: &str, iv: &[u8]) -> Result<Vec<u8>, Box<dyn Error>> {

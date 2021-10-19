@@ -1,6 +1,12 @@
 use std::convert::TryFrom;
 use std::str::from_utf8;
 use base64::DecodeError;
+use crypto::{
+    aes::{ecb_decryptor, KeySize}, 
+    blockmodes, 
+    symmetriccipher::SymmetricCipherError, 
+    buffer::{BufferResult, ReadBuffer, RefReadBuffer, RefWriteBuffer, WriteBuffer}
+};
 use log::info;
 use openssl::symm::{Cipher, decrypt};
 
@@ -34,15 +40,27 @@ pub fn dec_xor_cbc(bytes: &mut [u8], key: &[u8]) -> String {
     String::from(plaintext)
 }
 
-pub fn dec_aes128_ecb(bytes: &[u8], key: &[u8], iv: &[u8]) -> Result<DecryptResult, DecodeError> {
-    let cipher = Cipher::aes_128_ecb();
-    let plaintext = decrypt(
-        cipher, 
-        &key,
-        Some(iv),
-        &bytes,
-    ).unwrap();
-    let plaintext = from_utf8(&plaintext).expect("Failed to convert bytes to valid utf-8");
+pub fn dec_aes128_ecb(bytes: &[u8], key: &[u8], iv: &[u8]) -> Result<DecryptResult, SymmetricCipherError> {
+    let mut decryptor = ecb_decryptor(
+        KeySize::KeySize128, 
+        key, 
+        blockmodes::NoPadding,
+    );
+    let mut final_result = Vec::<u8>::new();
+    let mut read_buff = RefReadBuffer::new(&bytes);
+    let mut out_buff = [0u8; 4096];
+    let mut write_buff = RefWriteBuffer::new(&mut out_buff);
+    loop {
+        let result = decryptor.decrypt(&mut read_buff, &mut write_buff, true)?;
+
+        final_result.extend(write_buff.take_read_buffer().take_remaining().iter().map(|&i| i));
+
+        match result {
+            BufferResult::BufferUnderflow => break,
+            BufferResult::BufferOverflow => {}
+        }
+    }
+    let plaintext = from_utf8(&final_result).expect("Failed to convert bytes to valid utf-8");
 
     Ok(DecryptResult {
         plaintext: String::from(plaintext),
@@ -60,14 +78,19 @@ pub fn dec_aes128_ecb_b64(b64_str: &str, key: &str, iv: &[u8]) -> Result<Decrypt
             return Err(err);
         },
     };
-    let cipher = Cipher::aes_128_ecb();
-    let plaintext = decrypt(
-        cipher, 
-        &key.as_bytes(),
-        Some(iv),
-        &bytes,
-    ).unwrap();
-    let plaintext = from_utf8(&plaintext).expect("Failed to convert bytes to valid utf-8");
+    let mut decryptor = ecb_decryptor(KeySize::KeySize128, key.as_bytes(), blockmodes::NoPadding);
+    let mut input = RefReadBuffer::new(&bytes);
+    let mut out_buff = &mut [0u8; 16];
+    let mut output = RefWriteBuffer::new(out_buff);
+    decryptor.decrypt(&mut input, &mut output, false).expect("Failed to decrypt data");
+    // let cipher = Cipher::aes_128_ecb();
+    // let plaintext = decrypt(
+    //     cipher, 
+    //     &key.as_bytes(),
+    //     Some(iv),
+    //     &bytes,
+    // ).unwrap();
+    let plaintext = from_utf8(out_buff).expect("Failed to convert bytes to valid utf-8");
 
     Ok(DecryptResult {
         plaintext: String::from(plaintext),

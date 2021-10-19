@@ -12,6 +12,7 @@ hex = "0.4.3"
 log = "0.4.14"
 openssl = "0.10.33"
 rand = "0.8.4"
+rust-crypto = "0.2.36"
 simple_logger = "1.13.0"
 
 [dependencies.phf]
