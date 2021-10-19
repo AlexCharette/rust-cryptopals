@@ -3,10 +3,18 @@
 extern crate base64;
 extern crate log;
 
+use openssl::rand::rand_bytes;
+
 pub mod analyse;
 pub mod convert;
 pub mod decrypt;
 pub mod encrypt;
+
+pub fn get_rand_bytes_16() -> Vec<u8> {
+    let mut buf = [0u8; 16];
+    rand_bytes(&mut buf).unwrap();
+    buf.to_vec()
+}
 
 pub fn pad_pkcs7(bytes: &mut Vec<u8>, size: usize) {
     assert!(bytes.len() < size);
@@ -51,7 +59,7 @@ mod integration_tests {
         let key = b"YELLOW SUBMARINE";
         let expected = "Mellow bubmarone is the guy you wanna talk to";
         let iv = *b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00";
-        let mut ciphertext = encrypt::enc_xor_cbc(&mut plaintext[..], key, &iv, 16).ok().unwrap();
+        let mut ciphertext = encrypt::enc_aes128_cbc(&mut plaintext[..], key, &iv, 16).ok().unwrap();
         info!("Encrypted: {:?}", &ciphertext);
         let result = decrypt::dec_xor_cbc(&mut ciphertext, key);
         assert_eq!(&format!("{}", &result), &format!("{}", &expected));
@@ -80,6 +88,11 @@ mod integration_tests {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn generates_aes_key() {
+        assert_eq!(get_rand_bytes_16().len(), 16);
+    }
 
     #[test] // Cryptopals 2:1
     fn pads_with_pkcs7() {

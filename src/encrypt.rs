@@ -4,9 +4,27 @@ use base64::DecodeError;
 use hex::ToHex;
 use log::info;
 use openssl::{error::ErrorStack, symm::{Cipher, encrypt}};
-use super::pad_pkcs7;
+use rand::{Rng, thread_rng};
+use super::{get_rand_bytes_16, pad_pkcs7};
 
-pub fn enc_xor_cbc(bytes: &mut [u8], key: &[u8], iv: &[u8], block_size: usize) -> Result<Vec<u8>, Box<dyn Error>> {
+pub fn enc_aes128_rand(bytes: &mut [u8]) -> Result<Vec<u8>, Box<dyn Error>> {
+    // TODO Padd with 5-10 bytes before and after
+
+    let key = get_rand_bytes_16();
+    let iv = get_rand_bytes_16();
+    let use_ecb = thread_rng().gen_bool(1.0 / 2.0);
+    let encrypted_result: Result<Vec<u8>, Box<dyn Error>>;
+    match use_ecb {
+        true => { // use ecb
+            enc_aes128_ecb(bytes, &key, &iv)
+        },
+        false => { // use cbc
+            enc_aes128_cbc(bytes, &key, &iv, 16)
+        }
+    }
+}
+
+pub fn enc_aes128_cbc(bytes: &mut [u8], key: &[u8], iv: &[u8], block_size: usize) -> Result<Vec<u8>, Box<dyn Error>> {
     assert_eq!(key.len(), block_size);
 
     let mut prev_cipher_block = iv.to_vec();
@@ -32,9 +50,7 @@ pub fn enc_xor_cbc(bytes: &mut [u8], key: &[u8], iv: &[u8], block_size: usize) -
             },
             // TODO find a way to use this error
             Err(err) => {
-                err.errors().into_iter().for_each(|error| {
-                    eprintln!("{:?}", error)
-                });
+                eprintln!("{:?}", err);
             },
         }
     });
@@ -43,14 +59,22 @@ pub fn enc_xor_cbc(bytes: &mut [u8], key: &[u8], iv: &[u8], block_size: usize) -
     Ok(encrypted_bytes)
 }
 
-pub fn enc_aes128_ecb(bytes: &[u8], key: &[u8], iv: &[u8]) -> Result<Vec<u8>, ErrorStack> {
+pub fn enc_aes128_ecb(bytes: &[u8], key: &[u8], iv: &[u8]) -> Result<Vec<u8>, Box<dyn Error>> {
     let cipher = Cipher::aes_128_ecb();
-    encrypt(
+    match encrypt(
         cipher, 
         &key,
         Some(iv),
         bytes,
-    )
+    ) {
+        Ok(res) => Ok(res),
+        Err(err) => {
+            err.errors().into_iter().for_each(|error| {
+                eprintln!("{:?}", error)
+            });
+            Err(Box::new(err.errors()[0].to_owned()))
+        }
+    }
 }
 
 pub fn enc_aes128_ecb_b64(b64_str: &str, key: &str, iv: &[u8]) -> Result<Vec<u8>, Box<dyn Error>> {
