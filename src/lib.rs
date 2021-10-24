@@ -32,22 +32,18 @@ pub fn pad_pkcs7(bytes: &mut Vec<u8>, size: usize) {
 }
 
 pub fn get_hamming_dist(a: &[u8], b: &[u8]) -> i32 {
-    let mut xor: Vec<u8> = a.iter()
-        .zip(b.iter())
-        .map(|(&x, &y)| x ^ y).collect();
-    let sum = xor
-        .iter_mut()
-        .fold(0, |sum, b| {
-            let mut curr_bit: usize = 0;
-            let mut temp_sum = 0;
-            while curr_bit < 8 {
-                if *b & 0x01 == 1 {
-                    temp_sum += 1;
-                }
-                curr_bit += 1;
-                *b = *b >> 1;
+    let mut xor: Vec<u8> = a.iter().zip(b.iter()).map(|(&x, &y)| x ^ y).collect();
+    let sum = xor.iter_mut().fold(0, |sum, b| {
+        let mut curr_bit: usize = 0;
+        let mut temp_sum = 0;
+        while curr_bit < 8 {
+            if *b & 0x01 == 1 {
+                temp_sum += 1;
             }
-            sum + temp_sum
+            curr_bit += 1;
+            *b = *b >> 1;
+        }
+        sum + temp_sum
     });
     sum
 }
@@ -70,7 +66,9 @@ mod integration_tests {
         let block_size = 16;
         let expected = "Mellow bubmarone is the guy you wanna talk to";
         let iv = *b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00";
-        let mut encrypted_data = encrypt::enc_aes128_cbc(&mut plaintext[..], key, &iv, block_size).ok().unwrap();
+        let mut encrypted_data = encrypt::enc_aes128_cbc(&mut plaintext[..], key, &iv, block_size)
+            .ok()
+            .unwrap();
         info!("Encrypted: {:?}", &encrypted_data);
         let result = decrypt::dec_aes128_cbc(&mut encrypted_data, key, block_size);
         let contains_expected = result.contains(expected);
@@ -85,9 +83,12 @@ mod integration_tests {
         let b64_str = base64::encode(expected);
         let iv = *b"\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0A\x0B\x0C\x0D\x0E\x0F\
             \x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1A\x1B\x1C\x1D\x1E\x1F";
-        let encrypted_data = encrypt::enc_aes128_ecb(expected.as_bytes(), key.as_bytes(), &iv, false).ok().unwrap();
+        let encrypted_data =
+            encrypt::enc_aes128_ecb(expected.as_bytes(), key.as_bytes(), &iv, false)
+                .ok()
+                .unwrap();
         info!("Encrypted: {:?}", encrypted_data);
-        
+
         let key_bytes = b"YELLOW SUBMARINE";
         let result = decrypt::dec_aes128_ecb_to_string(&encrypted_data, key_bytes, false)
             .ok()
