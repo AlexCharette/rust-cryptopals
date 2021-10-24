@@ -165,9 +165,16 @@ pub fn get_char_freq_eng_score(str: &str) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use log::info;
+    use simple_logger::SimpleLogger;
+
+    fn init() {
+        SimpleLogger::new().init().unwrap();
+    }
 
     #[test] // Cryptopals 1:8
     fn detects_aes_ecb_in_file() {
+        // init();
         let mut file_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         file_path.push("data/1.8.txt");
         let result = detect_aes_ecb_in_file(&file_path, 128);
@@ -177,6 +184,7 @@ mod tests {
 
     #[test] // Cryptopals 1:4
     fn finds_message_in_file() {
+        // init();
         let mut file_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         file_path.push("data/1.4.txt");
         let result = find_message_in_file_1cx(&file_path);
@@ -186,6 +194,7 @@ mod tests {
 
     #[test] // Cryptopals 1:3
     fn returns_most_likely_eng() {
+        // init();
         let input = "1b37373331363f78151b7f2b783431333d78397828372d363c78373e783a393b3736";
         let result = most_likely_eng_1cx_hex(input);
         info!("Result: {}", result.score);

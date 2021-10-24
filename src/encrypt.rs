@@ -31,27 +31,33 @@ use super::{get_rand_bytes_16, pad_pkcs7};
 //     }
 // }
 
-pub fn enc_aes128_cbc(bytes: &mut [u8], key: &[u8], iv: &[u8], block_size: usize) -> Result<Vec<u8>, Box<dyn Error>> {
+pub fn enc_aes128_cbc(
+    bytes: &mut [u8],
+    key: &[u8],
+    iv: &[u8], 
+    block_size: usize,
+) -> Result<Vec<u8>, Box<dyn Error>> {
     assert_eq!(key.len(), block_size);
 
-    let mut prev_cipher_block = iv.to_vec();
+    let mut prev_block = iv.to_vec();
     let mut cipher_blocks = Vec::<Vec<u8>>::new();
+    let mut bytes = bytes.to_vec();
+    pad_pkcs7(&mut bytes, 16);
     // Split bytes into a vector of block_size'd chunks
     // TODO Is there some way I can make this a vector of slices and have it be functional?
-    let mut blocks: Vec<Vec<u8>> = bytes.chunks_mut(block_size).map(|chunk| chunk.to_vec()).collect();
+    let mut blocks: Vec<Vec<u8>> = bytes.chunks_mut(block_size)
+        .map(|chunk| chunk.to_vec())
+        .collect();
     blocks.iter_mut().for_each(|block| {
-        println!("Prev: {:?}", prev_cipher_block);
-        
-        if block.len() < block_size {
-            pad_pkcs7(block, block_size);
-            assert!(block.len() == block_size);
-        }
+
         let fake_iv: Vec<u8> = vec![];
-        let xored_bytes = fixed_xor(block, &prev_cipher_block);
-        let encrypted_bytes = enc_aes128_ecb(&xored_bytes, &key, &fake_iv);
+        assert_eq!(block.len(), prev_block.len());
+
+        let xored_bytes = fixed_xor(block, &prev_block);
+        let encrypted_bytes = enc_aes128_ecb(&xored_bytes, &key, &fake_iv, false);
         match encrypted_bytes {
             Ok(bytes) => {
-                prev_cipher_block = bytes.clone();
+                prev_block = bytes.clone();
                 cipher_blocks.push(bytes.to_owned());
             },
             // TODO find a way to use this error
@@ -65,12 +71,25 @@ pub fn enc_aes128_cbc(bytes: &mut [u8], key: &[u8], iv: &[u8], block_size: usize
     Ok(encrypted_bytes)
 }
 
-pub fn enc_aes128_ecb(bytes: &[u8], key: &[u8], iv: &[u8]) -> Result<Vec<u8>, SymmetricCipherError> {
-    let mut encryptor = ecb_encryptor(
-        KeySize::KeySize128, 
-        key, 
-        blockmodes::NoPadding,
-    );
+pub fn enc_aes128_ecb(
+    bytes: &[u8], 
+    key: &[u8], 
+    iv: &[u8], 
+    pad: bool,
+) -> Result<Vec<u8>, SymmetricCipherError> {
+    let mut encryptor = if pad {
+        ecb_encryptor(
+            KeySize::KeySize128, 
+            key, 
+            blockmodes::PkcsPadding,
+        ) 
+    } else {
+        ecb_encryptor(
+            KeySize::KeySize128, 
+            key, 
+            blockmodes::NoPadding,
+        )
+    };
     let mut final_result = Vec::<u8>::new();
     let mut read_buff = RefReadBuffer::new(bytes);
     let mut out_buff = [0u8; 4096];
@@ -86,28 +105,6 @@ pub fn enc_aes128_ecb(bytes: &[u8], key: &[u8], iv: &[u8]) -> Result<Vec<u8>, Sy
         }
     }
     Ok(final_result)
-    // match encryptor.encrypt(&mut input, &mut output, false) {
-    //     Ok(res) => {
-    //         final_result.extend()
-    //         Ok(output.take_read_buffer().take_remaining().to_vec())
-    //     },
-    //     Err(err) => Err(err)
-    // }
-    // let cipher = Cipher::aes_128_ecb();
-    // match encrypt(
-    //     cipher, 
-    //     &key,
-    //     Some(iv),
-    //     bytes,
-    // ) {
-    //     Ok(res) => Ok(res),
-    //     Err(err) => {
-    //         err.errors().into_iter().for_each(|error| {
-    //             eprintln!("{:?}", error)
-    //         });
-    //         Err(Box::new(err.errors()[0].to_owned()))
-    //     }
-    // }
 }
 
 pub fn enc_aes128_ecb_b64(b64_str: &str, key: &str, iv: &[u8]) -> Result<Vec<u8>, Box<dyn Error>> {
